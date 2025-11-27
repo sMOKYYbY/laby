@@ -1,5 +1,6 @@
 package g62221.labyrinthe.model;
 
+
 /**
  * Command to move a player.
  */

@@ -15,6 +15,7 @@ public class LabyrinthFacade extends Observable implements Observer {
         this.game = new Game();
         this.commandManager = new CommandManager();
         this.game.addObserver(this); // Listen to Game changes
+
     }
 
     /**
@@ -24,6 +25,7 @@ public class LabyrinthFacade extends Observable implements Observer {
     public void startGame(int nbPlayers) {
         commandManager.clear();
         game.start(nbPlayers);
+        game.debugBoard();
     }
 
     /**
@@ -91,6 +93,17 @@ public class LabyrinthFacade extends Observable implements Observer {
     public int getCurrentPlayerIndex() { return game.getCurrentPlayerIndex(); }
     public Game.State getGameState() { return game.getState(); }
     public int getNbPlayers() { return game.getPlayersCount(); }
+    public String getCurrentPlayerObjective() {
+        return game.getPlayerCurrentObjective(game.getCurrentPlayerIndex());
+    }
+
+    public int getCurrentPlayerCardsCount() {
+        return game.getPlayerCardsCount(game.getCurrentPlayerIndex());
+    }
+
+    public int getWinnerId() {
+        return (game.getWinner() != null) ? game.getWinner().getId() : -1;
+    }
 
     @Override
     public void update() {

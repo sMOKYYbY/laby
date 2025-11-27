@@ -13,17 +13,13 @@ public class App extends Application {
 
     @Override
     public void start(Stage primaryStage) {
-        // 1. Initialize Model
         LabyrinthFacade facade = new LabyrinthFacade();
-
-        // 2. Initialize View
         MainView view = new MainView(primaryStage, facade);
-
-        // 3. Initialize Controller
         Controller controller = new Controller(facade);
 
-        // 4. Bind Controller to View
+        // Connexion double sens
         view.setController(controller);
+        controller.setView(view); // Important pour afficher les erreurs !
     }
 
     /**
