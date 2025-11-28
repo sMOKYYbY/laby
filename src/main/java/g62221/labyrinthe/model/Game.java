@@ -230,4 +230,10 @@ public class Game extends Observable {
     public void teleportPlayer(int index, Position pos) {
         players.get(index).setPosition(pos);
     }
+    /**
+     * Récupère la position de départ d'un joueur (nécessaire pour la victoire).
+     */
+    public Position getPlayerStartPosition(int index) {
+        return players.get(index).getStartPosition();
+    }
 }

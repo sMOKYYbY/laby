@@ -7,15 +7,21 @@ import g62221.labyrinthe.model.LabyrinthFacade;
 import g62221.labyrinthe.model.Observer;
 import g62221.labyrinthe.model.Position;
 import g62221.labyrinthe.model.Tile;
+import javafx.animation.FadeTransition;
+import javafx.animation.ParallelTransition;
 import javafx.animation.PauseTransition;
+import javafx.animation.ScaleTransition;
+import javafx.animation.SequentialTransition;
+import javafx.animation.TranslateTransition;
+import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.effect.DropShadow;
+import javafx.scene.effect.GaussianBlur;
 import javafx.scene.effect.Glow;
-import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
@@ -29,6 +35,9 @@ public class MainView implements Observer {
     private final LabyrinthFacade facade;
     private final Stage stage;
 
+    private StackPane rootStack;
+    private BorderPane gameLayout;
+
     private GridPane mainGrid;
     private TileView[][] tileViews;
     private TileView extraTileView;
@@ -37,22 +46,37 @@ public class MainView implements Observer {
     private final List<PlayerInfoPanel> playerPanels = new ArrayList<>();
     private final List<Button> insertButtons = new ArrayList<>();
 
-    // Boutons de contrôle
     private Button btnRotate;
     private Button btnUndo;
     private Button btnRedo;
 
     private Controller controller;
     private boolean isBotPlaying = false;
+    private boolean gameEnded = false;
 
-    // Styles CSS constants pour uniformiser
+    private Game.State lastState = Game.State.WAITING_FOR_SLIDE;
+
     private static final String BTN_STYLE_NORMAL = "-fx-background-color: #444; -fx-text-fill: white; -fx-background-radius: 10; -fx-font-weight: bold; -fx-cursor: hand;";
     private static final String BTN_STYLE_HOVER = "-fx-background-color: #666; -fx-text-fill: white; -fx-background-radius: 10; -fx-font-weight: bold; -fx-cursor: hand;";
     private static final String BTN_ARROW_STYLE = "-fx-background-color: transparent; -fx-text-fill: #DDD; -fx-font-size: 24px; -fx-font-weight: bold; -fx-border-color: #555; -fx-border-radius: 50; -fx-border-width: 2; -fx-cursor: hand;";
 
+    private static final int TILE_SIZE = 85;
+
+
     public MainView(Stage stage, LabyrinthFacade facade) {
         this.stage = stage;
         this.facade = facade;
+        stage.setTitle("Labyrinthe - Projet 3dev3a");
+
+        try {
+
+            javafx.scene.image.Image icon = new javafx.scene.image.Image(getClass().getResourceAsStream("/icon.png"));
+            stage.getIcons().add(icon);
+        } catch (Exception e) {
+            System.err.println("Impossible de charger l'icône : " + e.getMessage());
+        }
+
+
         facade.addObserver(this);
         showMenu();
     }
@@ -64,7 +88,6 @@ public class MainView implements Observer {
     private void showMenu() {
         VBox root = new VBox(30);
         root.setAlignment(Pos.CENTER);
-        // Fond dégradé sombre
         root.setStyle("-fx-background-color: linear-gradient(to bottom right, #1a1a1a, #2b2b2b);");
 
         Label title = new Label("LABYRINTHE");
@@ -89,11 +112,8 @@ public class MainView implements Observer {
     private Button createStyledButton(String text, int nbPlayers) {
         Button btn = new Button(text);
         btn.setStyle(BTN_STYLE_NORMAL + " -fx-font-size: 18px; -fx-padding: 15 30;");
-
-        // Petit effet au survol
         btn.setOnMouseEntered(e -> btn.setStyle(BTN_STYLE_HOVER + " -fx-font-size: 18px; -fx-padding: 15 30;"));
         btn.setOnMouseExited(e -> btn.setStyle(BTN_STYLE_NORMAL + " -fx-font-size: 18px; -fx-padding: 15 30;"));
-
         btn.setOnAction(e -> launchGame(nbPlayers));
         return btn;
     }
@@ -105,26 +125,30 @@ public class MainView implements Observer {
         this.statusLabel = new Label("Initialisation...");
         this.insertButtons.clear();
         this.playerPanels.clear();
+        this.gameEnded = false;
+        this.lastState = Game.State.WAITING_FOR_SLIDE;
 
         initializeGameUI(nbPlayers);
         facade.startGame(nbPlayers);
     }
 
     private void initializeGameUI(int nbPlayers) {
-        BorderPane root = new BorderPane();
-        // Fond dégradé radial pour un effet "lumière au centre"
-        root.setStyle("-fx-background-color: radial-gradient(center 50% 50%, radius 100%, #2b2b2b, #000000);");
+        rootStack = new StackPane();
+        rootStack.setStyle("-fx-background-color: black;");
 
-        // --- TOP ---
+        gameLayout = new BorderPane();
+        gameLayout.setStyle("-fx-background-color: radial-gradient(center 50% 50%, radius 100%, #2b2b2b, #000000);");
+
+        // TOP
         VBox topBox = new VBox(5);
         topBox.setAlignment(Pos.CENTER);
         topBox.setPadding(new Insets(15));
         topBox.setStyle("-fx-background-color: rgba(0,0,0,0.6); -fx-border-color: #444; -fx-border-width: 0 0 2 0;");
         statusLabel.setStyle("-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: white; -fx-effect: dropshadow(one-pass-box, black, 5, 0, 0, 1);");
         topBox.getChildren().add(statusLabel);
-        root.setTop(topBox);
+        gameLayout.setTop(topBox);
 
-        // --- PANNEAUX ---
+        // PANELS
         VBox leftPanel = new VBox(50);
         leftPanel.setAlignment(Pos.CENTER);
         leftPanel.setPadding(new Insets(20));
@@ -157,15 +181,14 @@ public class MainView implements Observer {
             playerPanels.add((PlayerInfoPanel) rightPanel.getChildren().get(2));
         }
 
-        root.setLeft(leftPanel);
-        root.setRight(rightPanel);
+        gameLayout.setLeft(leftPanel);
+        gameLayout.setRight(rightPanel);
 
-        // --- PLATEAU ---
+        // GRID
         mainGrid.setAlignment(Pos.CENTER);
         mainGrid.setHgap(0);
         mainGrid.setVgap(0);
         mainGrid.setPadding(new Insets(20));
-        // Ombre sous le plateau pour le détacher du fond
         mainGrid.setEffect(new DropShadow(30, Color.BLACK));
 
         for (int r = 0; r < 7; r++) {
@@ -176,7 +199,7 @@ public class MainView implements Observer {
                 int finalR = r;
                 int finalC = c;
                 tv.setOnMouseClicked(e -> {
-                    if (!facade.isCurrentPlayerBot() && !isBotPlaying && controller != null)
+                    if (!facade.isCurrentPlayerBot() && !isBotPlaying && !gameEnded && controller != null)
                         controller.handleMove(finalR, finalC);
                 });
             }
@@ -189,9 +212,9 @@ public class MainView implements Observer {
             addInsertButton(Direction.RIGHT, idx, 0, idx + 1, "▶");
             addInsertButton(Direction.LEFT, idx, 8, idx + 1, "◀");
         }
-        root.setCenter(mainGrid);
+        gameLayout.setCenter(mainGrid);
 
-        // --- BOTTOM ---
+        // BOTTOM
         HBox controls = new HBox(20);
         controls.setPadding(new Insets(15));
         controls.setAlignment(Pos.CENTER);
@@ -200,7 +223,7 @@ public class MainView implements Observer {
         VBox extraBox = new VBox(5, new Label("Tuile en main"), extraTileView);
         extraBox.setAlignment(Pos.CENTER);
         ((Label)extraBox.getChildren().get(0)).setTextFill(Color.LIGHTGRAY);
-        extraTileView.setEffect(new DropShadow(10, Color.BLACK)); // Ombre sous la tuile bonus
+        extraTileView.setEffect(new DropShadow(10, Color.BLACK));
 
         btnRotate = createControlButton("Rotation ⟳");
         btnRotate.setOnAction(e -> { if (controller != null) controller.handleRotate(); });
@@ -212,9 +235,10 @@ public class MainView implements Observer {
         btnRedo.setOnAction(e -> { if (controller != null) controller.handleRedo(); });
 
         controls.getChildren().addAll(extraBox, btnRotate, btnUndo, btnRedo);
-        root.setBottom(controls);
+        gameLayout.setBottom(controls);
 
-        stage.getScene().setRoot(root);
+        rootStack.getChildren().add(gameLayout);
+        stage.getScene().setRoot(rootStack);
     }
 
     private Button createControlButton(String text) {
@@ -227,10 +251,9 @@ public class MainView implements Observer {
 
     private void addInsertButton(Direction dir, int logicIndex, int gridCol, int gridRow, String text) {
         Button btn = new Button(text);
-        btn.setPrefSize(85, 85);
+        btn.setPrefSize(TILE_SIZE, TILE_SIZE);
         btn.setStyle(BTN_ARROW_STYLE);
 
-        // Effet Hover sur les flèches
         btn.setOnMouseEntered(e -> {
             if(!btn.isDisabled()) btn.setStyle(BTN_ARROW_STYLE + "-fx-background-color: rgba(255,255,255,0.1); -fx-text-fill: white; -fx-border-color: white;");
         });
@@ -240,7 +263,7 @@ public class MainView implements Observer {
 
         btn.setUserData(new Object[]{dir, logicIndex});
         btn.setOnAction(e -> {
-            if (!facade.isCurrentPlayerBot() && !isBotPlaying && controller != null)
+            if (!facade.isCurrentPlayerBot() && !isBotPlaying && !gameEnded && controller != null)
                 controller.handleInsert(dir, logicIndex);
         });
         insertButtons.add(btn);
@@ -251,57 +274,33 @@ public class MainView implements Observer {
     public void update() {
         if (tileViews == null) return;
 
-        // 1. Tuiles
-        for (int r = 0; r < 7; r++) {
-            for (int c = 0; c < 7; c++) {
-                tileViews[r][c].update(facade.getTile(r, c));
-                tileViews[r][c].getChildren().removeIf(node -> node instanceof Circle);
-            }
+        updateTiles();
+        updatePlayers();
+        updatePlayerPanels();
+
+        // 1. Détection Animation
+        Game.State currentState = facade.getGameState();
+        if (lastState == Game.State.WAITING_FOR_SLIDE && currentState == Game.State.WAITING_FOR_MOVE) {
+            animateSlide(facade.getForbiddenDirection(), facade.getForbiddenIndex());
         }
-        extraTileView.update(facade.getExtraTile());
+        lastState = currentState;
 
-        // 2. Joueurs (Amélioré)
-        Color[] colors = {Color.web("#FF5555"), Color.web("#FFFF55"), Color.web("#55FF55"), Color.web("#5555FF")};
-        int currentPlayerIndex = facade.getCurrentPlayerIndex();
-
-        for (int i = 0; i < facade.getNbPlayers(); i++) {
-            Position pos = facade.getPlayerPosition(i);
-            Circle pawn = new Circle(30, colors[i % colors.length]);
-            pawn.setOpacity(0.7);
-            pawn.setStroke(Color.BLACK);
-            pawn.setStrokeWidth(2);
-
-            // Effet GLOW pour le joueur actif
-            if (i == currentPlayerIndex) {
-                pawn.setEffect(new Glow(0.8)); // Brille fort
-                pawn.setStroke(Color.WHITE);   // Contour blanc
-            } else {
-                pawn.setEffect(new DropShadow(5, Color.BLACK));
-            }
-
-            tileViews[pos.row()][pos.col()].getChildren().add(pawn);
-        }
-
-        // 3. Victoire
+        // 2. Victoire
         if (facade.getGameState() == Game.State.GAME_OVER) {
-            statusLabel.setText("VICTOIRE DU JOUEUR " + (facade.getWinnerId() + 1) + " !");
-            statusLabel.setTextFill(Color.GOLD);
-            mainGrid.setDisable(true);
+            if (!gameEnded) {
+                gameEnded = true;
+                showVictoryScreen(facade.getWinnerId());
+            }
             return;
         }
 
-        // 4. Update Panels
-        for (int i = 0; i < playerPanels.size() && i < facade.getNbPlayers(); i++) {
-            String obj = facade.getPlayerCurrentObjective(i);
-            int count = facade.getPlayerCardsCount(i);
-            List<String> found = facade.getPlayerFoundObjectives(i);
-            boolean isTurn = (i == currentPlayerIndex);
-            playerPanels.get(i).update(obj, count, found, isTurn);
-        }
+        // 3. Logique Tour / Bots
+        handleTurnLogic();
+    }
 
-        // 5. Bot Logic
+    private void handleTurnLogic() {
         boolean isBot = facade.isCurrentPlayerBot();
-        int playerNum = currentPlayerIndex + 1;
+        int playerNum = facade.getCurrentPlayerIndex() + 1;
 
         if (isBot) {
             statusLabel.setText("L'IA (Joueur " + playerNum + ") réfléchit...");
@@ -314,11 +313,14 @@ public class MainView implements Observer {
         if (isBot && !isBotPlaying) {
             setControlsEnabled(false);
             isBotPlaying = true;
-            PauseTransition pause = new PauseTransition(Duration.seconds(1));
+
+            // Délai de 1500ms
+            PauseTransition pause = new PauseTransition(Duration.millis(1500));
+
             pause.setOnFinished(e -> {
                 controller.handleAIPlay();
                 isBotPlaying = false;
-                javafx.application.Platform.runLater(this::update);
+                Platform.runLater(this::update);
             });
             pause.play();
         } else if (!isBot) {
@@ -332,6 +334,108 @@ public class MainView implements Observer {
                 setControlsEnabled(false);
                 mainGrid.setStyle("-fx-border-color: #55ff55; -fx-border-width: 3; -fx-border-radius: 5; -fx-effect: dropshadow(three-pass-box, lime, 10, 0, 0, 0);");
             }
+        }
+    }
+
+    private void animateSlide(Direction forbiddenDir, int index) {
+        ParallelTransition animationGroup = new ParallelTransition();
+        double fromX = 0;
+        double fromY = 0;
+
+        if (forbiddenDir == Direction.LEFT)  fromX = -TILE_SIZE;
+        if (forbiddenDir == Direction.RIGHT) fromX = TILE_SIZE;
+        if (forbiddenDir == Direction.UP)    fromY = -TILE_SIZE;
+        if (forbiddenDir == Direction.DOWN)  fromY = TILE_SIZE;
+
+        for (int i = 0; i < 7; i++) {
+            TileView tv = (forbiddenDir == Direction.LEFT || forbiddenDir == Direction.RIGHT)
+                    ? tileViews[index][i]
+                    : tileViews[i][index];
+
+            tv.setTranslateX(fromX);
+            tv.setTranslateY(fromY);
+
+            TranslateTransition tt = new TranslateTransition(Duration.millis(300), tv);
+            tt.setToX(0);
+            tt.setToY(0);
+            animationGroup.getChildren().add(tt);
+        }
+        animationGroup.play();
+    }
+
+    private void updateTiles() {
+        for (int r = 0; r < 7; r++) {
+            for (int c = 0; c < 7; c++) {
+                tileViews[r][c].update(facade.getTile(r, c));
+                tileViews[r][c].getChildren().removeIf(node -> node instanceof Circle);
+            }
+        }
+        extraTileView.update(facade.getExtraTile());
+    }
+
+    private void updatePlayers() {
+        Color[] colors = {Color.web("#FF5555"), Color.web("#FFFF55"), Color.web("#55FF55"), Color.web("#5555FF")};
+        int currentPlayerIndex = facade.getCurrentPlayerIndex();
+        int nbPlayers = facade.getNbPlayers();
+
+        java.util.Map<Position, List<Integer>> playersOnTile = new java.util.HashMap<>();
+        for (int i = 0; i < nbPlayers; i++) {
+            Position pos = facade.getPlayerPosition(i);
+            playersOnTile.putIfAbsent(pos, new ArrayList<>());
+            playersOnTile.get(pos).add(i);
+        }
+
+        for (int i = 0; i < nbPlayers; i++) {
+            Position pos = facade.getPlayerPosition(i);
+            List<Integer> buddies = playersOnTile.get(pos);
+
+            double radius;
+            double offsetX = 0;
+            double offsetY = 0;
+
+            if (buddies.size() > 1) {
+                radius = 18;
+                int rank = buddies.indexOf(i);
+                switch (rank) {
+                    case 0 -> { offsetX = -20; offsetY = -20; }
+                    case 1 -> { offsetX = 20; offsetY = -20; }
+                    case 2 -> { offsetX = -20; offsetY = 20; }
+                    case 3 -> { offsetX = 20; offsetY = 20; }
+                }
+            } else {
+                radius = 30;
+            }
+
+            Circle pawn = new Circle(radius, colors[i % colors.length]);
+            pawn.setOpacity(0.85);
+            pawn.setStroke(Color.BLACK);
+            pawn.setStrokeWidth(2);
+
+            // --- CORRECTION : Placement direct sans animation ---
+            pawn.setTranslateX(offsetX);
+            pawn.setTranslateY(offsetY);
+            // ----------------------------------------------------
+
+            if (i == currentPlayerIndex) {
+                pawn.setEffect(new Glow(0.8));
+                pawn.setStroke(Color.WHITE);
+                pawn.setViewOrder(-1);
+            } else {
+                pawn.setEffect(new DropShadow(5, Color.BLACK));
+            }
+
+            tileViews[pos.row()][pos.col()].getChildren().add(pawn);
+        }
+    }
+
+    private void updatePlayerPanels() {
+        int currentPlayerIdx = facade.getCurrentPlayerIndex();
+        for (int i = 0; i < playerPanels.size() && i < facade.getNbPlayers(); i++) {
+            String obj = facade.getPlayerCurrentObjective(i);
+            int count = facade.getPlayerCardsCount(i);
+            List<String> found = facade.getPlayerFoundObjectives(i);
+            boolean isTurn = (i == currentPlayerIdx);
+            playerPanels.get(i).update(obj, count, found, isTurn);
         }
     }
 
@@ -354,21 +458,86 @@ public class MainView implements Observer {
 
                 if (btnDir == forbiddenDir && btnIdx == forbiddenIdx) {
                     btn.setDisable(true);
-                    btn.setStyle(BTN_ARROW_STYLE + "-fx-text-fill: #552222; -fx-border-color: #552222;"); // Rouge sombre
+                    btn.setStyle(BTN_ARROW_STYLE + "-fx-text-fill: #552222; -fx-border-color: #552222;");
                     btn.setOpacity(0.5);
                 } else {
                     btn.setDisable(false);
                     btn.setOpacity(1.0);
-                    btn.setStyle(BTN_ARROW_STYLE); // Reset style
+                    btn.setStyle(BTN_ARROW_STYLE);
                 }
             }
         }
     }
 
     public void showError(String message) {
-        if (statusLabel != null) {
-            statusLabel.setText("ERREUR : " + message);
-            statusLabel.setTextFill(Color.RED);
-        }
+        Label toast = new Label(message);
+        toast.setStyle("-fx-background-color: rgba(255, 50, 50, 0.8); -fx-text-fill: white; -fx-font-size: 20px; -fx-font-weight: bold; -fx-padding: 20; -fx-background-radius: 10; -fx-border-color: white; -fx-border-width: 2; -fx-border-radius: 10;");
+        toast.setEffect(new DropShadow(10, Color.BLACK));
+
+        rootStack.getChildren().add(toast);
+
+        FadeTransition fadeIn = new FadeTransition(Duration.millis(300), toast);
+        fadeIn.setFromValue(0);
+        fadeIn.setToValue(1);
+
+        PauseTransition stay = new PauseTransition(Duration.seconds(2));
+
+        FadeTransition fadeOut = new FadeTransition(Duration.millis(500), toast);
+        fadeOut.setFromValue(1);
+        fadeOut.setToValue(0);
+
+        SequentialTransition seq = new SequentialTransition(fadeIn, stay, fadeOut);
+        seq.setOnFinished(e -> rootStack.getChildren().remove(toast));
+        seq.play();
+    }
+
+    private void showVictoryScreen(int winnerId) {
+        gameLayout.setEffect(new GaussianBlur(10));
+
+        VBox victoryBox = new VBox(20);
+        victoryBox.setAlignment(Pos.CENTER);
+        victoryBox.setMaxSize(500, 350);
+
+        boolean isHumanWinner = (winnerId == 0);
+
+        String mainTitleText = isHumanWinner ? "VICTOIRE !" : "DÉFAITE...";
+        String subTitleText = isHumanWinner
+                ? "BRAVO ! VOUS AVEZ GAGNÉ !"
+                : "LE BOT " + (winnerId + 1) + " A GAGNÉ !";
+
+        String colorHex = isHumanWinner ? "#00FF00" : "#FF0000";
+        Color glowColor = isHumanWinner ? Color.LIME : Color.RED;
+
+        victoryBox.setStyle("-fx-background-color: rgba(0, 0, 0, 0.9); -fx-border-color: " + colorHex + "; -fx-border-width: 4; -fx-background-radius: 20; -fx-border-radius: 20;");
+        victoryBox.setEffect(new DropShadow(30, glowColor));
+
+        Label title = new Label(mainTitleText);
+        title.setStyle("-fx-font-size: 60px; -fx-font-weight: bold; -fx-text-fill: " + colorHex + "; -fx-effect: dropshadow(three-pass-box, " + colorHex + ", 10, 0, 0, 0);");
+
+        Label subTitle = new Label(subTitleText);
+        subTitle.setStyle("-fx-font-size: 24px; -fx-text-fill: white; -fx-font-weight: bold;");
+
+        Button btnQuit = new Button("Quitter");
+        String btnColor = isHumanWinner ? "#005500" : "#550000";
+        btnQuit.setStyle("-fx-background-color: " + btnColor + "; -fx-text-fill: white; -fx-font-size: 18px; -fx-padding: 10 40; -fx-background-radius: 10; -fx-cursor: hand; -fx-border-color: white; -fx-border-width: 1;");
+
+        btnQuit.setOnMouseEntered(e -> btnQuit.setStyle("-fx-background-color: " + colorHex + "; -fx-text-fill: black; -fx-font-size: 18px; -fx-padding: 10 40; -fx-background-radius: 10; -fx-cursor: hand;"));
+        btnQuit.setOnMouseExited(e -> btnQuit.setStyle("-fx-background-color: " + btnColor + "; -fx-text-fill: white; -fx-font-size: 18px; -fx-padding: 10 40; -fx-background-radius: 10; -fx-cursor: hand; -fx-border-color: white;"));
+
+        btnQuit.setOnAction(e -> Platform.exit());
+
+        victoryBox.getChildren().addAll(title, subTitle, btnQuit);
+
+        victoryBox.setScaleX(0);
+        victoryBox.setScaleY(0);
+        rootStack.getChildren().add(victoryBox);
+
+        ScaleTransition st = new ScaleTransition(Duration.millis(600), victoryBox);
+        st.setFromX(0);
+        st.setFromY(0);
+        st.setToX(1);
+        st.setToY(1);
+        st.setInterpolator(javafx.animation.Interpolator.EASE_OUT);
+        st.play();
     }
 }

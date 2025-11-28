@@ -2,13 +2,12 @@ package g62221.labyrinthe.model;
 
 import java.util.*;
 
-/**
- * Facade pattern entry point. Provides a simplified interface to the game logic
- * for the Controller and View, and manages the AI logic.
- */
 public class LabyrinthFacade extends Observable implements Observer {
     private final Game game;
     private final CommandManager commandManager;
+
+    // NOUVEAU : Drapeau pour le mode silencieux
+    private boolean isSimulating = false;
 
     public LabyrinthFacade() {
         this.game = new Game();
@@ -16,22 +15,11 @@ public class LabyrinthFacade extends Observable implements Observer {
         this.game.addObserver(this);
     }
 
-    /**
-     * Starts a new game.
-     * @param nbPlayers Number of players.
-     */
     public void startGame(int nbPlayers) {
         commandManager.clear();
         game.start(nbPlayers);
     }
 
-    /**
-     * Inserts a tile into the board.
-     *
-     * @param direction Direction of insertion.
-     * @param index Row or column index.
-     * @return true if successful, false if the move was forbidden (anti-return).
-     */
     public boolean insertTile(Direction direction, int index) {
         try {
             Command cmd = new InsertTileCommand(game, direction, index);
@@ -42,25 +30,16 @@ public class LabyrinthFacade extends Observable implements Observer {
         }
     }
 
-    /**
-     * Moves the current player.
-     *
-     * @param row Target row.
-     * @param col Target column.
-     */
     public void movePlayer(int row, int col) {
         try {
             Position target = new Position(row, col);
             Command cmd = new MovePlayerCommand(game, target);
             commandManager.execute(cmd);
         } catch (Exception e) {
-            // Error handling ignored for cleaner console output
+            // Ignorer
         }
     }
 
-    /**
-     * Rotates the extra tile in hand.
-     */
     public void rotateExtraTile() {
         game.getBoard().getExtraTile().rotate();
         notifyObservers();
@@ -70,17 +49,29 @@ public class LabyrinthFacade extends Observable implements Observer {
     public void redo() { commandManager.redo(); notifyObservers(); }
 
     /**
-     * Executes the AI bot logic for the current turn.
-     * Strategies include: finding the treasure, testing all insertions, or random move.
+     * C'est ici que l'on bloque les notifications si l'IA est en train de réfléchir.
      */
+    @Override
+    public void update() {
+        if (!isSimulating) {
+            notifyObservers();
+        }
+    }
+
+    // --- IA INTELLIGENTE (Mode Silencieux) ---
     public void playBot() {
         if (!game.isCurrentPlayerBot()) return;
 
-        String objective = getCurrentPlayerObjective();
-        Position targetPos = (objective != null) ? findTreasurePosition(objective) : new Position(3,3);
+        // 1. On active le mode silencieux AVANT de commencer les tests
+        isSimulating = true;
 
-        // Fallback if target is not on board (e.g. on extra tile)
+        String objective = getCurrentPlayerObjective();
+        Position targetPos = (objective != null)
+                ? findTreasurePosition(objective)
+                : game.getPlayerStartPosition(game.getCurrentPlayerIndex());
+
         if (targetPos == null) {
+            isSimulating = false; // On réactive pour le coup aléatoire
             playRandomMove();
             return;
         }
@@ -88,7 +79,7 @@ public class LabyrinthFacade extends Observable implements Observer {
         int[] indices = {1, 3, 5};
         Direction[] dirs = Direction.values();
 
-        // 1. Simulation: Try all valid moves to reach target
+        // Simulation
         for (int idx : indices) {
             for (Direction dir : dirs) {
                 boolean success = insertTile(dir, idx);
@@ -96,20 +87,33 @@ public class LabyrinthFacade extends Observable implements Observer {
                     Position botPos = game.getPlayerPosition(game.getCurrentPlayerIndex());
                     Set<Position> reachable = game.getBoard().getReachablePositions(botPos);
 
-                    // Re-evaluate target pos as it might have shifted
-                    Position currentTarget = (objective != null) ? findTreasurePosition(objective) : new Position(3,3);
+                    // Recalcul cible
+                    Position currentTarget = (objective != null)
+                            ? findTreasurePosition(objective)
+                            : game.getPlayerStartPosition(game.getCurrentPlayerIndex());
 
                     if (currentTarget != null && reachable.contains(currentTarget)) {
+                        // VICTOIRE TROUVÉE !
+
+                        // A. On annule le coup de simulation (silencieusement)
+                        undo();
+
+                        // B. On désactive le mode silencieux
+                        isSimulating = false;
+
+                        // C. On rejoue le coup "pour de vrai" (la Vue le verra cette fois)
+                        insertTile(dir, idx);
                         movePlayer(currentTarget.row(), currentTarget.col());
-                        return; // Winning move found
+                        return;
                     }
-                    undo(); // Revert simulation
+                    undo(); // Annulation silencieuse
                 }
             }
         }
 
-        // 2. Fallback: Random move if no solution found
-        playRandomMove();
+        // Si aucune solution trouvée
+        isSimulating = false; // On réactive l'affichage
+        playRandomMove();     // On joue un coup visible
     }
 
     private void playRandomMove() {
@@ -163,7 +167,5 @@ public class LabyrinthFacade extends Observable implements Observer {
     public int getWinnerId() { return (game.getWinner() != null) ? game.getWinner().getId() : -1; }
     public Direction getForbiddenDirection() { return game.getForbiddenDirection(); }
     public int getForbiddenIndex() { return game.getForbiddenIndex(); }
-
-    @Override
-    public void update() { notifyObservers(); }
+    public Position getPlayerStartPosition(int index) { return game.getPlayerStartPosition(index); }
 }
