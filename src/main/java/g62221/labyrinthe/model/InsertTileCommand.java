@@ -21,11 +21,12 @@ public class InsertTileCommand implements Command {
 
     @Override
     public void undo() {
-        // Revert is complex: slide back opposite way.
-        // For this project level, we force slide back and force state revert.
-        // Note: Real player expulsion revert is hard, this is a simplified undo.
+        // 1. On annule le glissement du plateau
         game.getBoard().slide(dir.opposite(), index);
-        game.forceState(Game.State.WAITING_FOR_SLIDE); // Helper needed in Game
-        game.previousPlayer(); // Helper needed in Game
+
+        // 2. On revient à l'état "Attente d'insertion"
+        game.forceState(Game.State.WAITING_FOR_SLIDE);
+
+
     }
 }

@@ -8,13 +8,21 @@ import javafx.scene.paint.Color;
 import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 public class ImageFactory {
     private static final Map<String, Image> cache = new HashMap<>();
     private static final Image ERROR_IMAGE;
 
+    // Liste des trésors qui sont rangés dans le dossier "Fixed_tiles"
+    private static final Set<String> FIXED_TREASURES_FILES = Set.of(
+            "goal_book", "goal_candleholder", "goal_coffre", "goal_crown",
+            "goal_helmet", "goal_keys", "goal_map", "goal_money",
+            "goal_ring", "goal_saphir", "goal_skull", "goal_sword"
+    );
+
     static {
-        // CarrÃ© rose en cas d'erreur
+        // Carré rose (Magenta) pour signaler une image manquante
         WritableImage img = new WritableImage(100, 100);
         for (int i = 0; i < 100; i++)
             for (int j = 0; j < 100; j++)
@@ -30,10 +38,11 @@ public class ImageFactory {
                 if (is != null) {
                     cache.put(path, new Image(is));
                 } else {
-                    // System.err.println("Image manquante: " + path); // DÃ©commentez pour debug
+                    System.err.println("Image introuvable : " + path);
                     return ERROR_IMAGE;
                 }
             } catch (Exception e) {
+                e.printStackTrace();
                 return ERROR_IMAGE;
             }
         }
@@ -41,32 +50,33 @@ public class ImageFactory {
     }
 
     private static String determinePath(Tile tile) {
-        // Si la tuile a un nom spÃ©cifique (TrÃ©sor ou Coin nommÃ©)
+        // 1. Si la tuile a un nom spécifique (Trésor ou Coin)
         if (tile.getTreasure() != null) {
             String name = tile.getTreasure();
 
-            // 1. COINS SPÃ‰CIFIQUES (commencent par "fixed_tile")
+            // A. COINS SPÉCIFIQUES
             if (name.startsWith("fixed_tile")) {
                 return "/Corners/" + name + ".jpg";
             }
 
-            // 2. TRÃ‰SORS (commencent par "goal_")
-            // Note: on s'assure d'avoir le prÃ©fixe goal_
+            // B. TRÉSORS
+            // On s'assure d'avoir le préfixe goal_ (sécurité)
             String filename = name.startsWith("goal_") ? name : "goal_" + name;
 
-            if (tile.isFixed()) {
+            // VÉRIFICATION : Est-ce un trésor du dossier "Fixed_tiles" ?
+            if (FIXED_TREASURES_FILES.contains(filename)) {
                 return "/Fixed_tiles/" + filename + ".jpg";
             } else {
-                return "/" + filename + ".jpg"; // Racine (TrÃ©sors mobiles)
+                // Sinon, c'est un trésor mobile (racine)
+                return "/" + filename + ".jpg";
             }
         }
 
-        // 3. TUILES MOBILES VIDE (Pas de nom/trÃ©sor)
+        // 2. TUILES VIDES (I, L sans trésor)
         return switch (tile.getShape()) {
             case I -> "/I_tiles/I_Shape.jpg";
             case L -> "/L_tiles/L_tile.jpg";
-            // Cas fallback pour un T mobile sans trÃ©sor (rare mais possible dans le code)
-            default -> "/Fixed_tiles/goal_money.jpg"; // Temporaire, ou une image T vide si vous en avez une
+            default -> "/I_tiles/I_Shape.jpg";
         };
     }
 }

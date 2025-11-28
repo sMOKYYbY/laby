@@ -5,18 +5,23 @@ import g62221.labyrinthe.model.Direction;
 import g62221.labyrinthe.model.Game;
 import g62221.labyrinthe.model.LabyrinthFacade;
 import g62221.labyrinthe.model.Observer;
-import g62221.labyrinthe.model.Tile;
 import g62221.labyrinthe.model.Position;
+import g62221.labyrinthe.model.Tile;
+import javafx.animation.PauseTransition;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.effect.DropShadow;
+import javafx.scene.effect.Glow;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.stage.Stage;
-import javafx.scene.image.ImageView;
+import javafx.util.Duration;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -24,28 +29,31 @@ public class MainView implements Observer {
     private final LabyrinthFacade facade;
     private final Stage stage;
 
-    // Composants de la Vue Jeu
     private GridPane mainGrid;
     private TileView[][] tileViews;
     private TileView extraTileView;
     private Label statusLabel;
-    private Label objectiveLabel;
 
-    // ContrÃ´les
+    private final List<PlayerInfoPanel> playerPanels = new ArrayList<>();
+    private final List<Button> insertButtons = new ArrayList<>();
+
+    // Boutons de contrôle
     private Button btnRotate;
     private Button btnUndo;
     private Button btnRedo;
-    private final List<Button> insertButtons = new ArrayList<>();
 
     private Controller controller;
+    private boolean isBotPlaying = false;
+
+    // Styles CSS constants pour uniformiser
+    private static final String BTN_STYLE_NORMAL = "-fx-background-color: #444; -fx-text-fill: white; -fx-background-radius: 10; -fx-font-weight: bold; -fx-cursor: hand;";
+    private static final String BTN_STYLE_HOVER = "-fx-background-color: #666; -fx-text-fill: white; -fx-background-radius: 10; -fx-font-weight: bold; -fx-cursor: hand;";
+    private static final String BTN_ARROW_STYLE = "-fx-background-color: transparent; -fx-text-fill: #DDD; -fx-font-size: 24px; -fx-font-weight: bold; -fx-border-color: #555; -fx-border-radius: 50; -fx-border-width: 2; -fx-cursor: hand;";
 
     public MainView(Stage stage, LabyrinthFacade facade) {
         this.stage = stage;
         this.facade = facade;
-
         facade.addObserver(this);
-
-        // Au dÃ©marrage, on affiche le menu de sÃ©lection
         showMenu();
     }
 
@@ -53,155 +61,187 @@ public class MainView implements Observer {
         this.controller = controller;
     }
 
-    /**
-     * Affiche l'Ã©cran de sÃ©lection du nombre de joueurs.
-     */
     private void showMenu() {
         VBox root = new VBox(30);
         root.setAlignment(Pos.CENTER);
-        root.setStyle("-fx-background-color: #2b2b2b;");
+        // Fond dégradé sombre
+        root.setStyle("-fx-background-color: linear-gradient(to bottom right, #1a1a1a, #2b2b2b);");
 
-        // Titre
         Label title = new Label("LABYRINTHE");
-        title.setStyle("-fx-font-size: 48px; -fx-font-weight: bold; -fx-text-fill: white; -fx-effect: dropshadow(three-pass-box, black, 10, 0, 0, 0);");
+        title.setStyle("-fx-font-size: 60px; -fx-font-weight: bold; -fx-text-fill: gold; -fx-effect: dropshadow(three-pass-box, black, 10, 0, 0, 0);");
 
-        Label subTitle = new Label("Choisissez le nombre de joueurs :");
-        subTitle.setStyle("-fx-font-size: 18px; -fx-text-fill: #cccccc;");
+        Label subTitle = new Label("Projet 3dev3a");
+        subTitle.setStyle("-fx-font-size: 20px; -fx-text-fill: #aaaaaa;");
 
-        // Boutons de sÃ©lection
         HBox buttonsBox = new HBox(20);
         buttonsBox.setAlignment(Pos.CENTER);
-
-        Button btn2 = createMenuButton("2 Joueurs", 2);
-        Button btn3 = createMenuButton("3 Joueurs", 3);
-        Button btn4 = createMenuButton("4 Joueurs", 4);
-
-        buttonsBox.getChildren().addAll(btn2, btn3, btn4);
+        buttonsBox.getChildren().addAll(
+                createStyledButton("Vs 1 Bot", 2),
+                createStyledButton("Vs 2 Bots", 3),
+                createStyledButton("Vs 3 Bots", 4)
+        );
         root.getChildren().addAll(title, subTitle, buttonsBox);
 
-        Scene menuScene = new Scene(root, 1200, 800);
-        stage.setTitle("Labyrinth - Menu");
-        stage.setScene(menuScene);
+        stage.setScene(new Scene(root, 1400, 1000));
         stage.show();
     }
 
-    private Button createMenuButton(String text, int nbPlayers) {
+    private Button createStyledButton(String text, int nbPlayers) {
         Button btn = new Button(text);
-        btn.setStyle("-fx-font-size: 16px; -fx-padding: 10 20; -fx-base: #444; -fx-text-fill: white; -fx-cursor: hand;");
+        btn.setStyle(BTN_STYLE_NORMAL + " -fx-font-size: 18px; -fx-padding: 15 30;");
+
+        // Petit effet au survol
+        btn.setOnMouseEntered(e -> btn.setStyle(BTN_STYLE_HOVER + " -fx-font-size: 18px; -fx-padding: 15 30;"));
+        btn.setOnMouseExited(e -> btn.setStyle(BTN_STYLE_NORMAL + " -fx-font-size: 18px; -fx-padding: 15 30;"));
+
         btn.setOnAction(e -> launchGame(nbPlayers));
         return btn;
     }
 
-    /**
-     * Lance la partie avec le nombre de joueurs choisi.
-     */
     private void launchGame(int nbPlayers) {
-        // 1. Initialiser les conteneurs graphiques
         this.mainGrid = new GridPane();
         this.tileViews = new TileView[7][7];
         this.extraTileView = new TileView();
         this.statusLabel = new Label("Initialisation...");
-        this.objectiveLabel = new Label("Mission: ?");
         this.insertButtons.clear();
+        this.playerPanels.clear();
 
-        // 2. Construire l'interface de jeu (Grille, Boutons...)
-        initializeGameUI();
-
-        // 3. DÃ©marrer le modÃ¨le (ceci dÃ©clenchera update() via l'observer)
+        initializeGameUI(nbPlayers);
         facade.startGame(nbPlayers);
     }
 
-    /**
-     * Construit la scÃ¨ne principale du jeu.
-     */
-    private void initializeGameUI() {
+    private void initializeGameUI(int nbPlayers) {
         BorderPane root = new BorderPane();
-        root.setStyle("-fx-background-color: #2b2b2b;");
+        // Fond dégradé radial pour un effet "lumière au centre"
+        root.setStyle("-fx-background-color: radial-gradient(center 50% 50%, radius 100%, #2b2b2b, #000000);");
 
-        // --- TOP: HUD ---
+        // --- TOP ---
         VBox topBox = new VBox(5);
         topBox.setAlignment(Pos.CENTER);
         topBox.setPadding(new Insets(15));
-        topBox.setStyle("-fx-background-color: #333333; -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.8), 10, 0, 0, 0);");
-
-        statusLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: white;");
-        objectiveLabel.setStyle("-fx-font-size: 14px; -fx-text-fill: #cccccc;");
-
-        topBox.getChildren().addAll(statusLabel, objectiveLabel);
+        topBox.setStyle("-fx-background-color: rgba(0,0,0,0.6); -fx-border-color: #444; -fx-border-width: 0 0 2 0;");
+        statusLabel.setStyle("-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: white; -fx-effect: dropshadow(one-pass-box, black, 5, 0, 0, 1);");
+        topBox.getChildren().add(statusLabel);
         root.setTop(topBox);
 
-        // --- CENTER: Plateau ---
-        mainGrid.setAlignment(Pos.CENTER);
-        mainGrid.setHgap(5);
-        mainGrid.setVgap(5);
-        mainGrid.setPadding(new Insets(20));
+        // --- PANNEAUX ---
+        VBox leftPanel = new VBox(50);
+        leftPanel.setAlignment(Pos.CENTER);
+        leftPanel.setPadding(new Insets(20));
+        leftPanel.setPrefWidth(220);
 
-        // CrÃ©ation des tuiles (7x7)
+        VBox rightPanel = new VBox(50);
+        rightPanel.setAlignment(Pos.CENTER);
+        rightPanel.setPadding(new Insets(20));
+        rightPanel.setPrefWidth(220);
+
+        PlayerInfoPanel p1 = new PlayerInfoPanel(0, true);
+        playerPanels.add(p1);
+        leftPanel.getChildren().add(p1);
+
+        if (nbPlayers >= 2) {
+            PlayerInfoPanel p2 = new PlayerInfoPanel(1, false);
+            playerPanels.add(p2);
+            rightPanel.getChildren().add(p2);
+        }
+        if (nbPlayers >= 3) {
+            Region spacer = new Region();
+            VBox.setVgrow(spacer, Priority.ALWAYS);
+            leftPanel.getChildren().addAll(spacer, new PlayerInfoPanel(2, false));
+            playerPanels.add((PlayerInfoPanel) leftPanel.getChildren().get(2));
+        }
+        if (nbPlayers >= 4) {
+            Region spacer = new Region();
+            VBox.setVgrow(spacer, Priority.ALWAYS);
+            rightPanel.getChildren().addAll(spacer, new PlayerInfoPanel(3, false));
+            playerPanels.add((PlayerInfoPanel) rightPanel.getChildren().get(2));
+        }
+
+        root.setLeft(leftPanel);
+        root.setRight(rightPanel);
+
+        // --- PLATEAU ---
+        mainGrid.setAlignment(Pos.CENTER);
+        mainGrid.setHgap(0);
+        mainGrid.setVgap(0);
+        mainGrid.setPadding(new Insets(20));
+        // Ombre sous le plateau pour le détacher du fond
+        mainGrid.setEffect(new DropShadow(30, Color.BLACK));
+
         for (int r = 0; r < 7; r++) {
             for (int c = 0; c < 7; c++) {
                 TileView tv = new TileView();
                 tileViews[r][c] = tv;
-                // DÃ©calage +1 pour laisser place aux flÃ¨ches
                 mainGrid.add(tv, c + 1, r + 1);
-
                 int finalR = r;
                 int finalC = c;
                 tv.setOnMouseClicked(e -> {
-                    if (controller != null) controller.handleMove(finalR, finalC);
+                    if (!facade.isCurrentPlayerBot() && !isBotPlaying && controller != null)
+                        controller.handleMove(finalR, finalC);
                 });
             }
         }
 
-        // CrÃ©ation des flÃ¨ches d'insertion
         int[] mobileIndices = {1, 3, 5};
         for (int idx : mobileIndices) {
-            addInsertButton(Direction.DOWN, idx, idx + 1, 0, "â–¼");  // Haut
-            addInsertButton(Direction.UP, idx, idx + 1, 8, "â–²");    // Bas
-            addInsertButton(Direction.RIGHT, idx, 0, idx + 1, "â–¶"); // Gauche
-            addInsertButton(Direction.LEFT, idx, 8, idx + 1, "â—€");  // Droite
+            addInsertButton(Direction.DOWN, idx, idx + 1, 0, "▼");
+            addInsertButton(Direction.UP, idx, idx + 1, 8, "▲");
+            addInsertButton(Direction.RIGHT, idx, 0, idx + 1, "▶");
+            addInsertButton(Direction.LEFT, idx, 8, idx + 1, "◀");
         }
-
         root.setCenter(mainGrid);
 
-        // --- BOTTOM: ContrÃ´les ---
+        // --- BOTTOM ---
         HBox controls = new HBox(20);
         controls.setPadding(new Insets(15));
         controls.setAlignment(Pos.CENTER);
-        controls.setStyle("-fx-background-color: #333333;");
+        controls.setStyle("-fx-background-color: rgba(0,0,0,0.8); -fx-border-color: #444; -fx-border-width: 2 0 0 0;");
 
-        VBox extraBox = new VBox(5, new Label("Tuile Bonus"), extraTileView);
+        VBox extraBox = new VBox(5, new Label("Tuile en main"), extraTileView);
         extraBox.setAlignment(Pos.CENTER);
-        ((Label)extraBox.getChildren().get(0)).setTextFill(Color.WHITE);
+        ((Label)extraBox.getChildren().get(0)).setTextFill(Color.LIGHTGRAY);
+        extraTileView.setEffect(new DropShadow(10, Color.BLACK)); // Ombre sous la tuile bonus
 
-        btnRotate = new Button("Rotation âŸ³");
-        btnRotate.setStyle("-fx-font-size: 14px; -fx-padding: 10 20;");
+        btnRotate = createControlButton("Rotation ⟳");
         btnRotate.setOnAction(e -> { if (controller != null) controller.handleRotate(); });
 
-        Button btnAI = new Button("Coup Auto (IA)");
-        btnAI.setOnAction(e -> { if (controller != null) controller.handleAIPlay(); });
-
-        btnUndo = new Button("Annuler");
+        btnUndo = createControlButton("Annuler");
         btnUndo.setOnAction(e -> { if (controller != null) controller.handleUndo(); });
 
-        btnRedo = new Button("Refaire");
+        btnRedo = createControlButton("Refaire");
         btnRedo.setOnAction(e -> { if (controller != null) controller.handleRedo(); });
 
-        controls.getChildren().addAll(extraBox, btnRotate, btnAI, btnUndo, btnRedo);
+        controls.getChildren().addAll(extraBox, btnRotate, btnUndo, btnRedo);
         root.setBottom(controls);
 
-        // Changement de la scÃ¨ne
-        Scene gameScene = new Scene(root, 1000, 850);
-        stage.setTitle("Projet Labyrinthe - Jeu en cours");
-        stage.setScene(gameScene);
-        // stage.show() est dÃ©jÃ  actif, la scÃ¨ne change instantanÃ©ment
+        stage.getScene().setRoot(root);
+    }
+
+    private Button createControlButton(String text) {
+        Button btn = new Button(text);
+        btn.setStyle(BTN_STYLE_NORMAL + " -fx-padding: 10 20; -fx-font-size: 14px;");
+        btn.setOnMouseEntered(e -> btn.setStyle(BTN_STYLE_HOVER + " -fx-padding: 10 20; -fx-font-size: 14px;"));
+        btn.setOnMouseExited(e -> btn.setStyle(BTN_STYLE_NORMAL + " -fx-padding: 10 20; -fx-font-size: 14px;"));
+        return btn;
     }
 
     private void addInsertButton(Direction dir, int logicIndex, int gridCol, int gridRow, String text) {
         Button btn = new Button(text);
-        btn.setPrefSize(40, 40);
-        btn.setStyle("-fx-font-size: 16px; -fx-base: #444; -fx-text-fill: white;");
+        btn.setPrefSize(85, 85);
+        btn.setStyle(BTN_ARROW_STYLE);
+
+        // Effet Hover sur les flèches
+        btn.setOnMouseEntered(e -> {
+            if(!btn.isDisabled()) btn.setStyle(BTN_ARROW_STYLE + "-fx-background-color: rgba(255,255,255,0.1); -fx-text-fill: white; -fx-border-color: white;");
+        });
+        btn.setOnMouseExited(e -> {
+            if(!btn.isDisabled()) btn.setStyle(BTN_ARROW_STYLE);
+        });
+
+        btn.setUserData(new Object[]{dir, logicIndex});
         btn.setOnAction(e -> {
-            if (controller != null) controller.handleInsert(dir, logicIndex);
+            if (!facade.isCurrentPlayerBot() && !isBotPlaying && controller != null)
+                controller.handleInsert(dir, logicIndex);
         });
         insertButtons.add(btn);
         mainGrid.add(btn, gridCol, gridRow);
@@ -209,10 +249,9 @@ public class MainView implements Observer {
 
     @Override
     public void update() {
-        // Si les vues ne sont pas initialisÃ©es (ex: update appelÃ© avant launchGame), on ne fait rien
         if (tileViews == null) return;
 
-        // 1. Mise Ã  jour des tuiles
+        // 1. Tuiles
         for (int r = 0; r < 7; r++) {
             for (int c = 0; c < 7; c++) {
                 tileViews[r][c].update(facade.getTile(r, c));
@@ -221,95 +260,115 @@ public class MainView implements Observer {
         }
         extraTileView.update(facade.getExtraTile());
 
-        // 2. Affichage des joueurs
-        Color[] colors = {Color.RED, Color.YELLOW, Color.GREEN, Color.BLUE};
+        // 2. Joueurs (Amélioré)
+        Color[] colors = {Color.web("#FF5555"), Color.web("#FFFF55"), Color.web("#55FF55"), Color.web("#5555FF")};
+        int currentPlayerIndex = facade.getCurrentPlayerIndex();
+
         for (int i = 0; i < facade.getNbPlayers(); i++) {
             Position pos = facade.getPlayerPosition(i);
-            Circle pawn = new Circle(10, colors[i % colors.length]);
-
-
-            pawn.setOpacity(0.45);
-
+            Circle pawn = new Circle(30, colors[i % colors.length]);
+            pawn.setOpacity(0.7);
             pawn.setStroke(Color.BLACK);
             pawn.setStrokeWidth(2);
-            pawn.setEffect(new javafx.scene.effect.DropShadow(5, Color.BLACK));
+
+            // Effet GLOW pour le joueur actif
+            if (i == currentPlayerIndex) {
+                pawn.setEffect(new Glow(0.8)); // Brille fort
+                pawn.setStroke(Color.WHITE);   // Contour blanc
+            } else {
+                pawn.setEffect(new DropShadow(5, Color.BLACK));
+            }
+
             tileViews[pos.row()][pos.col()].getChildren().add(pawn);
         }
 
-        // --- NOUVEAU : 3. Gestion de la VICTOIRE ---
+        // 3. Victoire
         if (facade.getGameState() == Game.State.GAME_OVER) {
-            // On rÃ©cupÃ¨re l'ID du gagnant (+1 pour l'affichage humain 1-4)
-            int winnerId = facade.getWinnerId() + 1;
-            statusLabel.setText("VICTOIRE DU JOUEUR " + winnerId + " !");
+            statusLabel.setText("VICTOIRE DU JOUEUR " + (facade.getWinnerId() + 1) + " !");
             statusLabel.setTextFill(Color.GOLD);
-            statusLabel.setStyle("-fx-font-size: 24px; -fx-font-weight: bold; -fx-text-fill: gold;");
-
-            // On dÃ©sactive tout le plateau pour empÃªcher de jouer
             mainGrid.setDisable(true);
-            if (btnRotate != null) btnRotate.setDisable(true);
-            setInsertButtonsEnabled(false);
-            return; // On arrÃªte l'update ici
+            return;
         }
 
-        // --- NOUVEAU : 4. Gestion de l'Objectif (HUD) ---
-        // On rÃ©cupÃ¨re l'objectif du joueur dont c'est le tour
-        String objName = facade.getCurrentPlayerObjective();
-        int cardsLeft = facade.getCurrentPlayerCardsCount();
-
-        if (objName != null) {
-            // Astuce : On crÃ©e une tuile temporaire juste pour demander son image Ã  la Factory
-            Tile fakeTileForImage = new Tile(Tile.Shape.T, 0, objName, false);
-            ImageView objImg = new ImageView(ImageFactory.getImage(fakeTileForImage));
-
-            // Taille de l'image de l'objectif
-            objImg.setFitWidth(50);
-            objImg.setFitHeight(50);
-
-            objectiveLabel.setGraphic(objImg);
-            objectiveLabel.setText("Objectif (" + cardsLeft + " restants)");
-            objectiveLabel.setTextFill(Color.WHITE);
-        } else {
-            // Si objName est null, c'est que le joueur a fini ses cartes
-            objectiveLabel.setGraphic(null);
-            objectiveLabel.setText("RETOUR Ã€ LA CASE DÃ‰PART !");
-            objectiveLabel.setTextFill(Color.ORANGE);
+        // 4. Update Panels
+        for (int i = 0; i < playerPanels.size() && i < facade.getNbPlayers(); i++) {
+            String obj = facade.getPlayerCurrentObjective(i);
+            int count = facade.getPlayerCardsCount(i);
+            List<String> found = facade.getPlayerFoundObjectives(i);
+            boolean isTurn = (i == currentPlayerIndex);
+            playerPanels.get(i).update(obj, count, found, isTurn);
         }
 
-        // 5. Gestion des Ã‰tats du jeu (Texte et Boutons)
-        Game.State state = facade.getGameState();
-        int currentPlayer = facade.getCurrentPlayerIndex() + 1;
-        String colorName = getColorName(currentPlayer - 1);
+        // 5. Bot Logic
+        boolean isBot = facade.isCurrentPlayerBot();
+        int playerNum = currentPlayerIndex + 1;
 
-        statusLabel.setText("Tour du Joueur " + currentPlayer + " (" + colorName + ")");
-        statusLabel.setStyle("-fx-font-size: 18px; -fx-font-weight: bold; -fx-text-fill: white;");
-
-        if (state == Game.State.WAITING_FOR_SLIDE) {
-            statusLabel.setText(statusLabel.getText() + " : InsÃ©rez une tuile !");
-            if (btnRotate != null) btnRotate.setDisable(false);
-            setInsertButtonsEnabled(true);
-            mainGrid.setStyle("-fx-border-color: yellow; -fx-border-width: 2;");
+        if (isBot) {
+            statusLabel.setText("L'IA (Joueur " + playerNum + ") réfléchit...");
+            statusLabel.setTextFill(Color.CYAN);
         } else {
-            statusLabel.setText(statusLabel.getText() + " : DÃ©placez votre pion !");
-            if (btnRotate != null) btnRotate.setDisable(true);
-            setInsertButtonsEnabled(false);
-            mainGrid.setStyle("-fx-border-color: green; -fx-border-width: 2;");
+            statusLabel.setText("À vous de jouer ! (Joueur " + playerNum + ")");
+            statusLabel.setTextFill(Color.WHITE);
+        }
+
+        if (isBot && !isBotPlaying) {
+            setControlsEnabled(false);
+            isBotPlaying = true;
+            PauseTransition pause = new PauseTransition(Duration.seconds(1));
+            pause.setOnFinished(e -> {
+                controller.handleAIPlay();
+                isBotPlaying = false;
+                javafx.application.Platform.runLater(this::update);
+            });
+            pause.play();
+        } else if (!isBot) {
+            Game.State state = facade.getGameState();
+            if (state == Game.State.WAITING_FOR_SLIDE) {
+                statusLabel.setText(statusLabel.getText() + " : Insérez une tuile");
+                setControlsEnabled(true);
+                mainGrid.setStyle("-fx-border-color: #ffd700; -fx-border-width: 3; -fx-border-radius: 5; -fx-effect: dropshadow(three-pass-box, gold, 10, 0, 0, 0);");
+            } else {
+                statusLabel.setText(statusLabel.getText() + " : Déplacez votre pion");
+                setControlsEnabled(false);
+                mainGrid.setStyle("-fx-border-color: #55ff55; -fx-border-width: 3; -fx-border-radius: 5; -fx-effect: dropshadow(three-pass-box, lime, 10, 0, 0, 0);");
+            }
         }
     }
 
-    private void setInsertButtonsEnabled(boolean enabled) {
+    private void setControlsEnabled(boolean enableSlide) {
+        if (btnRotate != null) btnRotate.setDisable(!enableSlide);
+        if (btnUndo != null) btnUndo.setDisable(isBotPlaying);
+        if (btnRedo != null) btnRedo.setDisable(isBotPlaying);
+
+        Direction forbiddenDir = facade.getForbiddenDirection();
+        int forbiddenIdx = facade.getForbiddenIndex();
+
         for (Button btn : insertButtons) {
-            btn.setDisable(!enabled);
-            btn.setVisible(enabled);
-        }
-    }
+            if (!enableSlide) {
+                btn.setDisable(true);
+                btn.setOpacity(0.3);
+            } else {
+                Object[] data = (Object[]) btn.getUserData();
+                Direction btnDir = (Direction) data[0];
+                int btnIdx = (Integer) data[1];
 
-    private String getColorName(int index) {
-        String[] names = {"Rouge", "Jaune", "Vert", "Bleu"};
-        return (index >= 0 && index < names.length) ? names[index] : "Inconnu";
+                if (btnDir == forbiddenDir && btnIdx == forbiddenIdx) {
+                    btn.setDisable(true);
+                    btn.setStyle(BTN_ARROW_STYLE + "-fx-text-fill: #552222; -fx-border-color: #552222;"); // Rouge sombre
+                    btn.setOpacity(0.5);
+                } else {
+                    btn.setDisable(false);
+                    btn.setOpacity(1.0);
+                    btn.setStyle(BTN_ARROW_STYLE); // Reset style
+                }
+            }
+        }
     }
 
     public void showError(String message) {
-        statusLabel.setText("ERREUR : " + message);
-        statusLabel.setTextFill(Color.RED);
+        if (statusLabel != null) {
+            statusLabel.setText("ERREUR : " + message);
+            statusLabel.setTextFill(Color.RED);
+        }
     }
 }
