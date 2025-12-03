@@ -62,21 +62,19 @@ public class MainView implements Observer {
 
     private static final int TILE_SIZE = 85;
 
-
     public MainView(Stage stage, LabyrinthFacade facade) {
         this.stage = stage;
         this.facade = facade;
-        stage.setTitle("Labyrinthe - Projet 3dev3a");
+
 
         try {
-
             javafx.scene.image.Image icon = new javafx.scene.image.Image(getClass().getResourceAsStream("/icon.png"));
             stage.getIcons().add(icon);
         } catch (Exception e) {
-            System.err.println("Impossible de charger l'icône : " + e.getMessage());
+
         }
 
-
+        stage.setTitle("Labyrinthe - Projet 3dev3a");
         facade.addObserver(this);
         showMenu();
     }
@@ -93,8 +91,9 @@ public class MainView implements Observer {
         Label title = new Label("LABYRINTHE");
         title.setStyle("-fx-font-size: 60px; -fx-font-weight: bold; -fx-text-fill: gold; -fx-effect: dropshadow(three-pass-box, black, 10, 0, 0, 0);");
 
-        Label subTitle = new Label("Projet 3dev3a");
-        subTitle.setStyle("-fx-font-size: 20px; -fx-text-fill: #aaaaaa;");
+        // --- MISE À JOUR DU TEXTE : VOUS ÊTES LE JOUEUR VERT ---
+        Label subTitle = new Label("Projet 3dev3a - Fora Yassir 62221");
+        subTitle.setStyle("-fx-font-size: 20px; -fx-text-fill: #ffffff;");
 
         HBox buttonsBox = new HBox(20);
         buttonsBox.setAlignment(Pos.CENTER);
@@ -314,9 +313,7 @@ public class MainView implements Observer {
             setControlsEnabled(false);
             isBotPlaying = true;
 
-            // Délai de 1500ms
             PauseTransition pause = new PauseTransition(Duration.millis(1500));
-
             pause.setOnFinished(e -> {
                 controller.handleAIPlay();
                 isBotPlaying = false;
@@ -374,7 +371,9 @@ public class MainView implements Observer {
     }
 
     private void updatePlayers() {
-        Color[] colors = {Color.web("#FF5555"), Color.web("#FFFF55"), Color.web("#55FF55"), Color.web("#5555FF")};
+        // --- MISE À JOUR DES COULEURS (Vert, Bleu, Jaune, Rouge) ---
+        Color[] colors = {Color.web("#55FF55"), Color.web("#5555FF"), Color.web("#FFFF55"), Color.web("#FF5555")};
+
         int currentPlayerIndex = facade.getCurrentPlayerIndex();
         int nbPlayers = facade.getNbPlayers();
 
@@ -407,14 +406,11 @@ public class MainView implements Observer {
             }
 
             Circle pawn = new Circle(radius, colors[i % colors.length]);
-            pawn.setOpacity(0.85);
+            pawn.setOpacity(0.45);
             pawn.setStroke(Color.BLACK);
             pawn.setStrokeWidth(2);
-
-            // --- CORRECTION : Placement direct sans animation ---
             pawn.setTranslateX(offsetX);
             pawn.setTranslateY(offsetY);
-            // ----------------------------------------------------
 
             if (i == currentPlayerIndex) {
                 pawn.setEffect(new Glow(0.8));
@@ -450,7 +446,7 @@ public class MainView implements Observer {
         for (Button btn : insertButtons) {
             if (!enableSlide) {
                 btn.setDisable(true);
-                btn.setOpacity(0.3);
+                btn.setOpacity(0.15);
             } else {
                 Object[] data = (Object[]) btn.getUserData();
                 Direction btnDir = (Direction) data[0];

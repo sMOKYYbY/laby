@@ -29,69 +29,74 @@ public class Board {
      * </p>
      */
     private void initializeBoard() {
-        // --- 1. Prepare Mobile Treasures (Classified by shape) ---
+        // --- 1. Préparation des Trésors Mobiles (Classés par forme) ---
 
-        // List T: Treasures drawn on tiles with 3 openings (T-shape)
+        // Liste T : Trésors dessinés sur des tuiles à 3 embranchements (Forme T)
         List<String> mobileTreasuresT = new ArrayList<>(Arrays.asList(
                 "goal_bat", "goal_dragon", "goal_ghost", "goal_ghost2", "goal_pig", "goal_witch"
         ));
 
-        // List L: Treasures drawn on tiles with 2 openings (L-shape/Angle)
+        // Liste L : Trésors dessinés sur des tuiles à 2 embranchements (Forme L/Angle)
         List<String> mobileTreasuresL = new ArrayList<>(Arrays.asList(
                 "goal_butteryfly", "goal_hibou", "goal_insecte", "goal_lezard", "goal_mouse", "goal_spider"
         ));
 
+        // Mélange aléatoire des trésors
         Collections.shuffle(mobileTreasuresT);
         Collections.shuffle(mobileTreasuresL);
 
         int indexT = 0;
         int indexL = 0;
 
-        // --- 2. Create the deck of mobile tiles ---
+        // --- 2. Création de la pioche de tuiles mobiles ---
         List<Tile> mobileTiles = new ArrayList<>();
 
-        // A. 6 T-shaped tiles with treasures
+        // A. 6 tuiles "T" avec un trésor
         for (int i = 0; i < 6; i++) {
             mobileTiles.add(createRandomTile(Tile.Shape.T, mobileTreasuresT.get(indexT++)));
         }
 
-        // B. 6 L-shaped tiles with treasures
+        // B. 6 tuiles "L" avec un trésor
         for (int i = 0; i < 6; i++) {
             mobileTiles.add(createRandomTile(Tile.Shape.L, mobileTreasuresL.get(indexL++)));
         }
 
-        // C. 10 L-shaped tiles without treasures
+        // C. 10 tuiles "L" sans trésor (tuiles couloirs simples)
         for (int i = 0; i < 10; i++) {
             mobileTiles.add(createRandomTile(Tile.Shape.L, null));
         }
 
-        // D. 12 I-shaped tiles without treasures
+        // D. 12 tuiles "I" sans trésor (tuiles droites)
         for (int i = 0; i < 12; i++) {
             mobileTiles.add(createRandomTile(Tile.Shape.I, null));
         }
 
+        // Mélange final de toutes les tuiles mobiles pour la distribution
         Collections.shuffle(mobileTiles);
         int tilePileIndex = 0;
 
-        // --- 3. Fill the Grid ---
+        // --- 3. Remplissage du Plateau ---
         for (int r = 0; r < 7; r++) {
             for (int c = 0; c < 7; c++) {
+                // Une case est fixe si sa ligne ET sa colonne sont paires (ex: 0,0 ; 2,4)
                 boolean isFixed = (r % 2 == 0) && (c % 2 == 0);
 
                 if (isFixed) {
+                    // Création spécifique pour les tuiles inamovibles
                     grid[r][c] = createFixedTile(r, c);
                 } else {
+                    // Remplissage avec la pioche pour les cases mobiles
                     if (tilePileIndex < mobileTiles.size()) {
                         grid[r][c] = mobileTiles.get(tilePileIndex++);
                     } else {
-                        // Fallback (should not happen)
+                        // Sécurité : Cas impossible si le compte est bon
                         grid[r][c] = new Tile(Tile.Shape.I, 0, null, false);
                     }
                 }
             }
         }
 
-        // The last remaining tile becomes the extra tile in hand
+        // La dernière tuile restante devient la tuile supplémentaire (en main du joueur)
         if (tilePileIndex < mobileTiles.size()) {
             this.extraTile = mobileTiles.get(tilePileIndex);
         } else {
@@ -109,8 +114,8 @@ public class Board {
     private Tile createFixedTile(int r, int c) {
         String key = r + "," + c;
 
-        // --- CORNERS (Shape L) ---
-        // Rotations are calculated to open towards the inside of the board.
+        // --- COINS (Shape L) ---
+        // Les rotations sont définies pour que les ouvertures pointent vers l'intérieur du plateau.
         switch (key) {
             case "0,0": return new Tile(Tile.Shape.L, 90, "fixed_tile_upleft_corner", true);
             case "0,6": return new Tile(Tile.Shape.L, 180, "fixed_tile_upright_corner", true);
@@ -118,16 +123,25 @@ public class Board {
             case "6,6": return new Tile(Tile.Shape.L, 270, "fixed_tile_downright_corner", true);
         }
 
-        // --- FIXED TREASURES (Shape T) ---
-        // Rotations are calculated so the T points towards the board.
-        // Base T (0°) = LEFT+DOWN+RIGHT (Points Down)
+        // --- AUTRES TUILES FIXES (Shape T) ---
+        // Calcul de la rotation pour que le "T" pointe vers le centre ou la direction opposée au bord.
         int rotation = 0;
 
-        if (r == 0) rotation = 0;        // Top Row: Points Down (0°)
-        else if (r == 6) rotation = 180; // Bottom Row: Points Up (180°)
-        else if (c == 0) rotation = 270; // Left Col: Points Right (270°)
-        else if (c == 6) rotation = 90;  // Right Col: Points Left (90°)
-        else rotation = 0;               // Center tiles default to 0°
+        if (r == 0) rotation = 0;        // Ligne du Haut : Pointe vers le Bas (0°)
+        else if (r == 6) rotation = 180; // Ligne du Bas : Pointe vers le Haut (180°)
+        else if (c == 0) rotation = 270; // Colonne Gauche : Pointe vers la Droite (270°)
+        else if (c == 6) rotation = 90;  // Colonne Droite : Pointe vers la Gauche (90°)
+
+            // Cas particuliers des tuiles centrales (2,2 ; 4,2 ; 4,4...)
+        else {
+            switch (key) {
+                case "2,2": rotation = 270; break;
+                case "4,2": rotation = 180; break;
+                case "4,4": rotation = 90; break;
+                case "2,4": rotation = 90; break;
+                default: rotation = 0;
+            }
+        }
 
         String treasureName = getFixedTreasureName(key);
         if (treasureName != null) {
@@ -169,6 +183,7 @@ public class Board {
      * @return A new Tile instance.
      */
     private Tile createRandomTile(Tile.Shape shape, String treasure) {
+        // Génère une rotation aléatoire parmi 0, 90, 180, 270 degrés
         int randomRotation = new Random().nextInt(4) * 90;
         return new Tile(shape, randomRotation, treasure, false);
     }
@@ -182,13 +197,16 @@ public class Board {
      * @throws IllegalArgumentException if the index corresponds to a fixed line.
      */
     public void slide(Direction dir, int index) {
+        // Vérifie que l'index correspond bien à une ligne mobile (impaire)
         if (index % 2 == 0) throw new IllegalArgumentException("Cannot slide a fixed line!");
 
         Tile newExtra = null;
+
+        // Logique de décalage selon la direction
         if (dir == Direction.RIGHT) {
-            newExtra = grid[index][6];
-            System.arraycopy(grid[index], 0, grid[index], 1, 6);
-            grid[index][0] = extraTile;
+            newExtra = grid[index][6]; // La dernière tuile sort
+            System.arraycopy(grid[index], 0, grid[index], 1, 6); // Décalage
+            grid[index][0] = extraTile; // Insertion au début
         } else if (dir == Direction.LEFT) {
             newExtra = grid[index][0];
             System.arraycopy(grid[index], 1, grid[index], 0, 6);
@@ -202,6 +220,8 @@ public class Board {
             for (int i = 0; i < 6; i++) grid[i][index] = grid[i + 1][index];
             grid[6][index] = extraTile;
         }
+
+        // La tuile éjectée devient la nouvelle tuile en main
         extraTile = newExtra;
     }
 
@@ -215,6 +235,8 @@ public class Board {
     public Set<Position> getReachablePositions(Position start) {
         Set<Position> visited = new HashSet<>();
         Queue<Position> queue = new LinkedList<>();
+
+        // Initialisation du parcours BFS
         queue.add(start);
         visited.add(start);
 
@@ -222,11 +244,16 @@ public class Board {
             Position current = queue.poll();
             Tile currentTile = grid[current.row()][current.col()];
 
+            // Pour chaque direction ouverte sur la tuile actuelle
             for (Direction dir : currentTile.getConnectors()) {
                 Position neighborPos = current.next(dir);
+
+                // Si la case voisine existe (est dans la grille)
                 if (isValid(neighborPos)) {
                     Tile neighborTile = grid[neighborPos.row()][neighborPos.col()];
-                    // Check mutual connection
+
+                    // Vérification CRUCIALE : Connexion mutuelle
+                    // Le voisin doit avoir une ouverture vers la case d'où l'on vient
                     if (neighborTile.getConnectors().contains(dir.opposite()) && !visited.contains(neighborPos)) {
                         visited.add(neighborPos);
                         queue.add(neighborPos);
@@ -237,6 +264,11 @@ public class Board {
         return visited;
     }
 
+    /**
+     * Checks if a position is within the grid boundaries.
+     * @param p The position to check.
+     * @return true if valid.
+     */
     private boolean isValid(Position p) {
         return p.row() >= 0 && p.row() < 7 && p.col() >= 0 && p.col() < 7;
     }

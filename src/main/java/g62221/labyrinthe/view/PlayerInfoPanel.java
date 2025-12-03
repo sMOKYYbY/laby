@@ -23,8 +23,8 @@ public class PlayerInfoPanel extends VBox {
     private final Label remainingCountLabel;
     private final FlowPane foundTreasuresPane;
 
-    // Couleurs des joueurs pour le thème
-    private static final String[] PLAYER_COLORS = {"#FF5555", "#FFFF55", "#55FF55", "#5555FF"}; // Rouge, Jaune, Vert, Bleu
+    // --- MISE À JOUR DES COULEURS (Vert, Bleu, Jaune, Rouge) ---
+    private static final String[] PLAYER_COLORS = {"#55FF55", "#5555FF", "#FFFF55", "#FF5555"};
 
     public PlayerInfoPanel(int playerId, boolean isHuman) {
         this.playerId = playerId;
@@ -32,21 +32,17 @@ public class PlayerInfoPanel extends VBox {
 
         this.setAlignment(Pos.TOP_CENTER);
         this.setSpacing(10);
-        // Fond noir semi-transparent + Bords arrondis
         this.setStyle("-fx-background-color: rgba(30, 30, 30, 0.85); -fx-background-radius: 15; -fx-border-radius: 15; -fx-border-width: 2; -fx-border-color: #444;");
         this.setPadding(new javafx.geometry.Insets(15));
         this.setPrefWidth(190);
 
-        // Effet d'ombre sous le panneau
         this.setEffect(new DropShadow(10, Color.BLACK));
 
-        // 1. Nom du joueur (Stylisé)
         String name = isHuman ? "VOUS (J1)" : "BOT " + (playerId + 1);
         this.nameLabel = new Label(name);
         this.nameLabel.setFont(Font.font("Arial", FontWeight.BOLD, 16));
         this.nameLabel.setTextFill(Color.web(PLAYER_COLORS[playerId % 4]));
 
-        // 2. Zone Objectif (Encadrée)
         VBox targetBox = new VBox(5);
         targetBox.setAlignment(Pos.CENTER);
         targetBox.setStyle("-fx-background-color: rgba(255,255,255,0.05); -fx-background-radius: 10; -fx-padding: 10;");
@@ -58,7 +54,6 @@ public class PlayerInfoPanel extends VBox {
         this.currentCardView = new ImageView();
         this.currentCardView.setFitWidth(70);
         this.currentCardView.setFitHeight(70);
-        // Ombre sous la carte pour le relief
         this.currentCardView.setEffect(new DropShadow(5, Color.BLACK));
 
         this.remainingCountLabel = new Label("?");
@@ -67,7 +62,6 @@ public class PlayerInfoPanel extends VBox {
 
         targetBox.getChildren().addAll(targetTitle, currentCardView, remainingCountLabel);
 
-        // 3. Zone Butin
         VBox foundSection = new VBox(5);
         foundSection.setAlignment(Pos.CENTER);
 
@@ -87,12 +81,10 @@ public class PlayerInfoPanel extends VBox {
     }
 
     public void update(String currentObjective, int cardsRemaining, List<String> foundObjectives, boolean isCurrentTurn) {
-        // Mise en évidence du joueur actif
         if (isCurrentTurn) {
-            // Bordure brillante de la couleur du joueur + Glow
             String pColor = PLAYER_COLORS[playerId % 4];
             this.setStyle("-fx-background-color: rgba(40, 40, 40, 0.95); -fx-background-radius: 15; -fx-border-radius: 15; -fx-border-width: 3; -fx-border-color: " + pColor + ";");
-            this.setEffect(new DropShadow(15, Color.web(pColor))); // Effet de néon
+            this.setEffect(new DropShadow(15, Color.web(pColor)));
         } else {
             this.setStyle("-fx-background-color: rgba(30, 30, 30, 0.85); -fx-background-radius: 15; -fx-border-radius: 15; -fx-border-width: 1; -fx-border-color: #555;");
             this.setEffect(new DropShadow(5, Color.BLACK));
@@ -100,7 +92,6 @@ public class PlayerInfoPanel extends VBox {
 
         this.remainingCountLabel.setText(cardsRemaining + " restante(s)");
 
-        // Affichage carte
         if (currentObjective != null) {
             if (isHuman) {
                 Tile fakeTile = new Tile(Tile.Shape.T, 0, currentObjective, false);
@@ -123,7 +114,6 @@ public class PlayerInfoPanel extends VBox {
             this.remainingCountLabel.setStyle("-fx-text-fill: #FF5555; -fx-font-weight: bold;");
         }
 
-        // Affichage Butin
         foundTreasuresPane.getChildren().clear();
         for (String treasure : foundObjectives) {
             Tile fakeTile = new Tile(Tile.Shape.T, 0, treasure, false);

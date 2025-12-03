@@ -58,6 +58,38 @@ public class Player {
             this.currentObjective = null; // No more objectives, must return to start.
         }
     }
+    /**
+     * Un "Snapshot" immuable des données du joueur à un instant T.
+     */
+    public record PlayerState(
+            String currentObj,
+            List<String> stackContent,
+            List<String> foundContent
+    ) {}
+
+    /**
+     * Crée une sauvegarde de l'état actuel (Cartes + Objectifs).
+     */
+    public PlayerState saveState() {
+        return new PlayerState(
+                this.currentObjective,
+                new ArrayList<>(this.objectives),      // Copie défensive de la pile
+                new ArrayList<>(this.foundObjectives)  // Copie défensive de la liste
+        );
+    }
+
+    /**
+     * Restaure le joueur dans un état sauvegardé.
+     */
+    public void restoreState(PlayerState state) {
+        this.currentObjective = state.currentObj();
+
+        this.objectives.clear();
+        this.objectives.addAll(state.stackContent());
+
+        this.foundObjectives.clear();
+        this.foundObjectives.addAll(state.foundContent());
+    }
 
     /**
      * Checks if the player has found all their objectives.
