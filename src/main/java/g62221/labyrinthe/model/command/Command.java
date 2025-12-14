@@ -1,4 +1,4 @@
-package g62221.labyrinthe.model;
+package g62221.labyrinthe.model.command;
 
 /**
  * Interface defining the contract for the Command design pattern.

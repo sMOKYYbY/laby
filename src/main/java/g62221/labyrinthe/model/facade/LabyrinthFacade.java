@@ -1,4 +1,15 @@
-package g62221.labyrinthe.model;
+package g62221.labyrinthe.model.facade;
+
+import g62221.labyrinthe.model.Direction;
+import g62221.labyrinthe.model.Game;
+import g62221.labyrinthe.model.Position;
+import g62221.labyrinthe.model.Tile;
+import g62221.labyrinthe.model.command.Command;
+import g62221.labyrinthe.model.command.CommandManager;
+import g62221.labyrinthe.model.command.InsertTileCommand;
+import g62221.labyrinthe.model.command.MovePlayerCommand;
+import g62221.labyrinthe.model.observer.Observable;
+import g62221.labyrinthe.model.observer.Observer;
 
 import java.util.*;
 
@@ -88,6 +99,13 @@ public class LabyrinthFacade extends Observable implements Observer {
     public void rotateExtraTile() {
         // Rotation simple de la tuile en main
         game.getBoard().getExtraTile().rotate();
+        notifyObservers();
+    }
+    /**
+     * Rotates the extra tile currently in hand counter-clockwise.
+     */
+    public void rotateExtraTileCCW() {
+        game.getBoard().getExtraTile().rotateCounterClockwise();
         notifyObservers();
     }
 
@@ -243,8 +261,6 @@ public class LabyrinthFacade extends Observable implements Observer {
         }
         return null;
     }
-
-    // --- Getters delegating to Game ---
 
     /**
      * Checks if the current player is a bot.

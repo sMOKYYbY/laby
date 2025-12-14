@@ -1,7 +1,7 @@
 package g62221.labyrinthe.controller;
 
 import g62221.labyrinthe.model.Direction;
-import g62221.labyrinthe.model.LabyrinthFacade;
+import g62221.labyrinthe.model.facade.LabyrinthFacade;
 import g62221.labyrinthe.view.MainView;
 
 /**
@@ -40,6 +40,12 @@ public class Controller {
     public void handleRotate() {
         // Appelle la façade pour effectuer une rotation de 90 degrés sur la tuile bonus
         facade.rotateExtraTile();
+    }
+    /**
+     * Handles the action of rotating the extra tile in hand (Counter-Clockwise).
+     */
+    public void handleRotateLeft() {
+        facade.rotateExtraTileCCW();
     }
 
     /**

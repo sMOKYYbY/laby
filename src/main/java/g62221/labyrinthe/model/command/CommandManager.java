@@ -1,4 +1,4 @@
-package g62221.labyrinthe.model;
+package g62221.labyrinthe.model.command;
 
 import java.util.Stack;
 

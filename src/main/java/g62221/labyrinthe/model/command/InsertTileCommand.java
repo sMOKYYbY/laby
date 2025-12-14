@@ -1,4 +1,8 @@
-package g62221.labyrinthe.model;
+package g62221.labyrinthe.model.command;
+
+import g62221.labyrinthe.model.Direction;
+import g62221.labyrinthe.model.Game;
+import g62221.labyrinthe.model.Position;
 
 import java.util.ArrayList;
 import java.util.List;

@@ -28,7 +28,7 @@ public class Board {
      * are correctly assigned to 'T' or 'L' shapes based on their visual representation.
      * </p>
      */
-    private void initializeBoard() {
+    public void initializeBoard() {
         // --- 1. Préparation des Trésors Mobiles (Classés par forme) ---
 
         // Liste T : Trésors dessinés sur des tuiles à 3 embranchements (Forme T)

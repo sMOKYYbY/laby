@@ -3,8 +3,8 @@ package g62221.labyrinthe.model;
 /**
  * Enumeration representing the four cardinal directions used for movement and orientation.
  * <p>
- * Each direction is associated with a delta for row and column coordinates,
- * facilitating calculations on the 2D grid.
+ * Each direction is associated with a row delta and a column delta,
+ * facilitating calculations on the 2D grid (row-major order).
  * </p>
  */
 public enum Direction {
@@ -31,11 +31,13 @@ public enum Direction {
     /**
      * The change in the row index when moving in this direction.
      */
+    // Delta ligne : -1 pour monter, +1 pour descendre (l'axe Y est inversé en informatique)
     private final int deltaRow;
 
     /**
      * The change in the column index when moving in this direction.
      */
+    // Delta colonne : -1 pour gauche, +1 pour droite
     private final int deltaCol;
 
     /**
@@ -78,7 +80,7 @@ public enum Direction {
      */
     public Direction opposite() {
         // Retourne la direction opposée : Haut <-> Bas, Gauche <-> Droite.
-        // Utilisé pour empêcher d'annuler le coup précédent.
+        // C'est indispensable pour implémenter la règle "Anti-Retour" (interdiction d'annuler le coup précédent).
         return switch (this) {
             case UP -> DOWN;
             case DOWN -> UP;

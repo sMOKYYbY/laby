@@ -1,5 +1,6 @@
 package g62221.labyrinthe.model;
 
+import g62221.labyrinthe.model.observer.Observable;
 import java.util.*;
 
 /**
@@ -10,7 +11,7 @@ import java.util.*;
  * such as valid moves, player expulsion, objective collection, and victory conditions.
  * </p>
  * <p>
- * It extends {@link Observable} to notify registered observers (like the Facade or View)
+ * It extends {@link Observable} to notify registered observers (like the View)
  * whenever the game state changes.
  * </p>
  */
@@ -25,9 +26,9 @@ public class Game extends Observable {
      * Represents the possible states of a game turn.
      */
     public enum State {
-        /** The player must insert a tile into the board. */
+        /** Phase 1: The player must insert a tile into the board. */
         WAITING_FOR_SLIDE,
-        /** The player must move their pawn (or stay put). */
+        /** Phase 2: The player must move their pawn (or stay put). */
         WAITING_FOR_MOVE,
         /** The game has ended. */
         GAME_OVER
@@ -58,19 +59,20 @@ public class Game extends Observable {
      * @param nbPlayers The number of players (between 2 and 4).
      */
     public void start(int nbPlayers) {
-        // Nettoyage de la liste des joueurs pour une nouvelle partie
+        // Nettoyage de la liste des joueurs pour garantir une nouvelle partie propre
         players.clear();
         winner = null;
         forbiddenDirection = null;
         forbiddenIndex = -1;
+        board.initializeBoard();
 
         // Définition des positions de départ dans les 4 coins du plateau
         // P1: Bas-Gauche (6,0), P2: Bas-Droite (6,6), P3: Haut-Droite (0,6), P4: Haut-Gauche (0,0)
         Position[] starts = {
-                new Position(6,0),
-                new Position(6,6),
-                new Position(0,6),
-                new Position(0,0)
+                new Position(6, 0),
+                new Position(6, 6),
+                new Position(0, 6),
+                new Position(0, 0)
         };
 
         // Création des objets Joueurs
@@ -81,7 +83,7 @@ public class Game extends Observable {
         // Mélange et distribution des cartes objectifs
         distributeCards();
 
-        // Le premier joueur commence
+        // Le premier joueur commence, phase d'insertion
         currentPlayerIndex = 0;
         currentState = State.WAITING_FOR_SLIDE;
         notifyObservers();
@@ -110,6 +112,7 @@ public class Game extends Observable {
                 "goal_book", "goal_candleholder", "goal_coffre", "goal_crown", "goal_helmet", "goal_keys",
                 "goal_map", "goal_money", "goal_ring", "goal_saphir", "goal_skull", "goal_sword"
         ));
+
         // Mélange aléatoire du paquet
         Collections.shuffle(allTreasures);
 
@@ -142,18 +145,18 @@ public class Game extends Observable {
         // Vérifie qu'on est bien dans la phase d'insertion
         if (currentState != State.WAITING_FOR_SLIDE) return;
 
-        // Vérification de la règle anti-retour : on ne peut pas annuler le coup précédent
+        // Règle Anti-Retour : on empêche le joueur d'annuler immédiatement le coup précédent
         if (dir == forbiddenDirection && index == forbiddenIndex) {
             throw new IllegalArgumentException("Forbidden move! You cannot reverse the previous slide.");
         }
 
-        // Modification du plateau (glissement)
+        // Modification physique du plateau (glissement)
         board.slide(dir, index);
 
-        // Gestion des joueurs qui seraient poussés hors du plateau
+        // Gestion des joueurs qui seraient poussés hors du plateau (Pac-Man effect)
         handlePlayerExpulsion(dir, index);
 
-        // Mise à jour de l'interdit pour le prochain joueur (l'opposé de ce mouvement)
+        // Mise à jour de l'interdit pour le prochain tour (l'opposé de ce mouvement)
         this.forbiddenDirection = dir.opposite();
         this.forbiddenIndex = index;
 
@@ -178,7 +181,7 @@ public class Game extends Observable {
 
         Player currentP = players.get(currentPlayerIndex);
 
-        // Vérification qu'un chemin existe entre la position actuelle et la destination
+        // Vérification qu'un chemin existe entre la position actuelle et la destination (via BFS)
         if (!board.getReachablePositions(currentP.getPosition()).contains(destination)) {
             throw new IllegalArgumentException("Path is blocked!");
         }
@@ -225,7 +228,7 @@ public class Game extends Observable {
      * @return true if the player has found all objectives and returned to their start position.
      */
     private boolean checkVictory(Player p) {
-        // Victoire si tous les objectifs sont trouvés ET que le joueur est revenu à sa case départ
+        // Condition de Victoire : Tous les objectifs trouvés ET retour à la case départ
         return p.hasFinishedObjectives() && p.getPosition().equals(p.getStartPosition());
     }
 
@@ -259,129 +262,41 @@ public class Game extends Observable {
         }
     }
 
-    /**
-     * Manually sets the forbidden move state.
-     * Used by the Undo mechanism to restore the previous constraint.
-     *
-     * @param dir   The forbidden direction.
-     * @param index The forbidden index.
-     */
+    // --- Getters and Accessors ---
+    // (Standard accessors used by Facade/View)
+
     public void setForbiddenState(Direction dir, int index) {
         this.forbiddenDirection = dir;
         this.forbiddenIndex = index;
     }
 
-    // --- Getters and Accessors ---
-
-    /**
-     * Gets the game board.
-     * @return The Board object.
-     */
     public Board getBoard() { return board; }
-
-    /**
-     * Gets the position of a specific player.
-     * @param index The player's index.
-     * @return The position of the player.
-     */
     public Position getPlayerPosition(int index) { return players.get(index).getPosition(); }
-
-    /**
-     * Gets the index of the current player.
-     * @return The index (0 to nbPlayers-1).
-     */
     public int getCurrentPlayerIndex() { return currentPlayerIndex; }
-
-    /**
-     * Gets the current state of the game turn.
-     * @return The current State.
-     */
     public State getState() { return currentState; }
-
-    /**
-     * Gets the total number of players.
-     * @return The number of players.
-     */
     public int getPlayersCount() { return players.size(); }
-
-    /**
-     * Gets the current objective name for a specific player.
-     * @param index The player's index.
-     * @return The name of the treasure, or null if finished.
-     */
     public String getPlayerCurrentObjective(int index) { return players.get(index).getCurrentObjective(); }
-
-    /**
-     * Gets the number of remaining cards for a specific player.
-     * @param index The player's index.
-     * @return The count of remaining objectives.
-     */
     public int getPlayerCardsCount(int index) { return players.get(index).getCardsRemaining(); }
-
-    /**
-     * Gets the list of objectives already found by a player.
-     * @param index The player's index.
-     * @return A list of treasure names found.
-     */
     public List<String> getPlayerFoundObjectives(int index) { return players.get(index).getFoundObjectives(); }
-
-    /**
-     * Gets the winner of the game.
-     * @return The winning Player object, or null if game is not over.
-     */
     public Player getWinner() { return winner; }
-
-    /**
-     * Gets the currently forbidden direction for insertion.
-     * @return The forbidden Direction.
-     */
     public Direction getForbiddenDirection() { return forbiddenDirection; }
-
-    /**
-     * Gets the currently forbidden index for insertion.
-     * @return The forbidden row/column index.
-     */
     public int getForbiddenIndex() { return forbiddenIndex; }
-
-    /**
-     * Gets the starting position of a player.
-     * @param index The player's index.
-     * @return The start Position.
-     */
     public Position getPlayerStartPosition(int index) { return players.get(index).getStartPosition(); }
 
-    /**
-     * Calculates the index of the previous player in the turn order.
-     * @return The index of the previous player.
-     */
     public int getPreviousPlayerIndex() {
         return (currentPlayerIndex - 1 + players.size()) % players.size();
     }
 
-    /**
-     * Reverts the turn to the previous player.
-     */
     public void previousPlayer() {
         this.currentPlayerIndex = getPreviousPlayerIndex();
     }
 
-    /**
-     * Forces the game state to a specific value.
-     * Used mainly for Undo/Redo operations.
-     * @param state The state to enforce.
-     */
     public void forceState(State state) { this.currentState = state; }
 
-    /**
-     * Teleports a player to a specific position.
-     * Used for Undo/Redo to restore player positions exactly.
-     *
-     * @param index The player's index.
-     * @param pos   The position to teleport to.
-     */
     public void teleportPlayer(int index, Position pos) {
         players.get(index).setPosition(pos);
     }
+
     // --- Advanced Undo/Redo Helpers (Memento Pattern) ---
 
     /**
@@ -396,8 +311,7 @@ public class Game extends Observable {
      * @return A {@link Player.PlayerState} record representing the player's current data.
      */
     public Player.PlayerState getPlayerState(int index) {
-        // Récupère un instantané (Memento) de l'état du joueur (cartes, objectifs trouvés)
-        // pour pouvoir le restaurer plus tard en cas d'annulation (Undo).
+        // Capture un instantané (Memento) de l'état du joueur pour le Undo/Redo
         return players.get(index).saveState();
     }
 
@@ -412,8 +326,7 @@ public class Game extends Observable {
      * @param state The {@link Player.PlayerState} snapshot to apply.
      */
     public void restorePlayerState(int index, Player.PlayerState state) {
-        // Restaure l'état du joueur (objectifs, pile de cartes) à partir d'une sauvegarde.
-        // Utilisé par la commande MovePlayerCommand.undo() pour annuler la découverte d'un trésor.
+        // Restaure l'état du joueur (si on annule la découverte d'un trésor par exemple)
         players.get(index).restoreState(state);
     }
 
@@ -425,9 +338,7 @@ public class Game extends Observable {
      * </p>
      */
     public void resetWinner() {
-        // Réinitialise le gagnant à null.
-        // C'est crucial si le joueur annule le coup qui lui a fait gagner la partie.
+        // Réinitialise le gagnant à null (nécessaire si on annule le coup de la victoire)
         this.winner = null;
     }
-
 }

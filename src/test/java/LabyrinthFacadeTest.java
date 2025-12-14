@@ -1,10 +1,8 @@
 import g62221.labyrinthe.model.*;
+import g62221.labyrinthe.model.facade.LabyrinthFacade;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
-
-import java.util.List;
-import java.util.Stack;
 
 class LabyrinthFacadeTest {
 
